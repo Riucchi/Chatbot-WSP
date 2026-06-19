@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - WhatsApp Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        h1 { color: #2c3e50; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+        th, td { border: 1px solid #ddd; padding: .75rem; text-align: left; }
+        th { background: #2f4f4f; color: #fff; }
+        tr:nth-child(even) { background: #f9f9f9; }
+        .panel { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 3px 8px rgba(0,0,0,.08); }
+        .small { color: #555; font-size: .95rem; }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h1>Dashboard Admin</h1>
+        <p class="small">Este dashboard es para administración. Protegido con JWT.</p>
+
+        <h2>Clientes registrados</h2>
+        <table>
+            <tr><th>ID</th><th>Empresa</th><th>WhatsApp</th><th>Email</th><th>Rol</th><th>Activo</th><th>Creación</th><th>Acciones</th></tr>
+            {% for cliente in clientes %}
+            <tr>
+                <td>{{ cliente.id }}</td>
+                <td>{{ cliente.nombre_empresa }}</td>
+                <td>{{ cliente.numero_whatsapp }}</td>
+                <td>{{ cliente.email }}</td>
+                <td>{{ cliente.rol }}</td>
+                <td>{{ 'Sí' if cliente.activo else 'No' }}</td>
+                <td>{{ cliente.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                    {% if cliente.activo %}
+                    <button data-client-id="{{ cliente.id }}" class="toggle-active">Desactivar</button>
+                    {% else %}
+                    <button data-client-id="{{ cliente.id }}" class="toggle-active">Activar</button>
+                    {% endif %}
+                    <select class="role-select" data-client-id="{{ cliente.id }}">
+                        <option value="owner" {% if cliente.rol == 'owner' %}selected{% endif %}>owner</option>
+                        <option value="admin" {% if cliente.rol == 'admin' %}selected{% endif %}>admin</option>
+                        <option value="support" {% if cliente.rol == 'support' %}selected{% endif %}>support</option>
+                    </select>
+                    <button data-client-id="{{ cliente.id }}" class="role-save">Guardar</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <h2>Próximos turnos</h2>
+        <div style="margin-bottom: 1rem;">
+            <form method="get" action="/admin/dashboard">
+                <label>Estado:
+                    <select name="estado">
+                        <option value="" {% if not filtro_estado %}selected{% endif %}>Todos</option>
+                        <option value="pendiente" {% if filtro_estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                        <option value="confirmado" {% if filtro_estado == 'confirmado' %}selected{% endif %}>Confirmado</option>
+                        <option value="completado" {% if filtro_estado == 'completado' %}selected{% endif %}>Completado</option>
+                        <option value="cancelado" {% if filtro_estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                    </select>
+                </label>
+                <label>Fecha:
+                    <input type="date" name="fecha" value="{{ filtro_fecha }}" />
+                </label>
+                <button type="submit">Filtrar</button>
+            </form>
+        </div>
+        <table>
+            <tr><th>ID</th><th>Cliente ID</th><th>Número cliente</th><th>Fecha turno</th><th>Estado</th><th>Creación</th></tr>
+            {% for turno in turnos %}
+            <tr>
+                <td>{{ turno.id }}</td>
+                <td>{{ turno.cliente_id }}</td>
+                <td>{{ turno.cliente_numero }}</td>
+                <td>{{ turno.fecha_turno.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>{{ turno.estado }}</td>
+                <td>{{ turno.fecha_creacion.strftime('%d/%m/%Y %H:%M') }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    <script>
+        async function getBearerToken() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                alert('Debe iniciar sesión con token JWT válido en localStorage key access_token.');
+            }
+            return token;
+        }
+
+        document.querySelectorAll('.toggle-active').forEach(button => {
+            button.addEventListener('click', async (event) => {
+                const clienteId = event.target.dataset.clientId;
+                const token = await getBearerToken();
+                const action = event.target.innerText.trim() === 'Activar' ? 'activar' : 'desactivar';
+                const url = `/api/admin/clientes/${clienteId}/${action}`;
+                const res = await fetch(url, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) location.reload();
+                else alert('Error al actualizar estado de cliente');
+            });
+        });
+
+        document.querySelectorAll('.role-save').forEach(button => {
+            button.addEventListener('click', async (event) => {
+                const clienteId = event.target.dataset.clientId;
+                const selectedRole = document.querySelector(`.role-select[data-client-id='${clienteId}']`).value;
+                const token = await getBearerToken();
+                const res = await fetch(`/api/admin/clientes/${clienteId}/rol?rol=${selectedRole}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) location.reload();
+                else alert('Error al cambiar rol');
+            });
+        });
+    </script>
+</body>
+</html>
